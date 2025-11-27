@@ -8,18 +8,20 @@ import {
     Pressable,
     Platform,
     Image,
+    Animated,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
+
 export default function App() {
     const [text, setText] = useState("");
     const [todos, setTodos] = useState([]);
     const [date, setDate] = useState(new Date());
     const [showPicker, setShowpicker] = useState(false);
     const [photo, setPhoto] = useState(null);
+
     const getPhoto = async () => {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
-
         if (status !== "granted") {
             alert("카메라 권한이 필요합니다.");
             return;
@@ -49,9 +51,18 @@ export default function App() {
             id: Date.now().toString(),
             title: text.trim(),
             date: formatDate(date),
+            anima: new Animated.Value(0),
         };
+
         setTodos([newTodo, ...todos]);
         setText("");
+
+        // 새로 추가된 아이템만 애니메이션
+        Animated.timing(newTodo.anima, {
+            toValue: 1,
+            duration: 700,
+            useNativeDriver: false,
+        }).start();
     };
 
     const removeTodo = (id) => {
@@ -59,12 +70,36 @@ export default function App() {
     };
 
     const changeDate = (e, chDate) => {
-        if (Platform.OS === "android") {
-            setShowpicker(false);
-        }
-        if (chDate) {
-            setDate(chDate);
-        }
+        if (Platform.OS === "android") setShowpicker(false);
+        if (chDate) setDate(chDate);
+    };
+
+    const TodoItem = ({ item, index }) => {
+        const rot = item.anima.interpolate({
+            inputRange: [0, 0.33, 0.67, 1],
+            outputRange: ["0deg", "-10deg", "10deg", "0deg"],
+        });
+
+        const sca = item.anima.interpolate({
+            inputRange: [0, 0.33, 0.67, 1],
+            outputRange: [1, 1.2, 1.2, 1],
+        });
+
+        return (
+            <Animated.View
+                style={{ transform: [{ scale: sca }, { rotate: rot }] }}
+            >
+                <Pressable
+                    style={styles.todoItem}
+                    onLongPress={() => removeTodo(item.id)}
+                >
+                    <Text style={styles.todoNumber}>{index + 1}.</Text>
+                    <Text style={styles.todoText}>{item.title}</Text>
+                    <Text>{item.date}</Text>
+                    <Text style={styles.todoHint}>길게 눌러서 삭제</Text>
+                </Pressable>
+            </Animated.View>
+        );
     };
 
     return (
@@ -86,6 +121,7 @@ export default function App() {
                         <Text style={styles.addText}>추가</Text>
                     </Pressable>
                 </View>
+
                 {showPicker && (
                     <DateTimePicker
                         value={date}
@@ -105,19 +141,10 @@ export default function App() {
                         </View>
                     }
                     renderItem={({ item, index }) => (
-                        <Pressable
-                            style={styles.todoItem}
-                            onLongPress={() => removeTodo(item.id)}
-                        >
-                            <Text style={styles.todoNumber}>{index + 1}.</Text>
-                            <Text style={styles.todoText}>{item.title}</Text>
-                            <Text>{item.date}</Text>
-                            <Text style={styles.todoHint}>
-                                길게 눌러서 삭제
-                            </Text>
-                        </Pressable>
+                        <TodoItem item={item} index={index} />
                     )}
                 />
+
                 <Pressable onPress={getPhoto} style={styles.cameraBtn}>
                     <Text style={styles.cameraText}>카메라 촬영</Text>
                 </Pressable>
@@ -136,9 +163,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingTop: 50,
     },
-    innerContainer: {
-        width: "90%",
-    },
+    innerContainer: { width: "90%" },
     title: {
         fontSize: 28,
         fontWeight: "bold",
@@ -146,11 +171,7 @@ const styles = StyleSheet.create({
         textAlign: "center",
         color: "#333",
     },
-    inputRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 20,
-    },
+    inputRow: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
     input: {
         flex: 1,
         height: 40,
@@ -171,71 +192,26 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 8,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 2,
     },
-    addText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "bold",
-    },
-    dateBtn: {
-        marginLeft: 10,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        backgroundColor: "#28a745",
-    },
-    dateText: {
-        color: "#fff",
-        fontSize: 14,
-    },
-    list: {
-        width: "100%",
-    },
+    addText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+    list: { width: "100%" },
     todoItem: {
         backgroundColor: "#fff",
         paddingVertical: 12,
         paddingHorizontal: 15,
         borderRadius: 8,
         marginBottom: 10,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 1,
     },
-    todoNumber: {
-        fontWeight: "bold",
-        marginBottom: 4,
-        color: "#555",
-    },
-    todoText: {
-        fontSize: 16,
-        color: "#333",
-    },
-    todoDate: {
-        fontSize: 12,
-        color: "#888",
-        marginTop: 2,
-    },
+    todoNumber: { fontWeight: "bold", marginBottom: 4, color: "#555" },
+    todoText: { fontSize: 16, color: "#333" },
     todoHint: {
         fontSize: 12,
         color: "#aaa",
         marginTop: 4,
         fontStyle: "italic",
     },
-    emptyBox: {
-        paddingVertical: 40,
-        alignItems: "center",
-    },
-    emptyText: {
-        color: "#aaa",
-        fontSize: 16,
-    },
+    emptyBox: { paddingVertical: 40, alignItems: "center" },
+    emptyText: { color: "#aaa", fontSize: 16 },
     cameraBtn: {
         marginTop: 20,
         backgroundColor: "#ff5722",
@@ -243,15 +219,6 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         alignItems: "center",
     },
-    cameraText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "bold",
-    },
-    photo: {
-        width: "100%",
-        height: 200,
-        marginTop: 15,
-        borderRadius: 8,
-    },
+    cameraText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+    photo: { width: "100%", height: 200, marginTop: 15, borderRadius: 8 },
 });
