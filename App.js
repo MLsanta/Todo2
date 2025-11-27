@@ -19,7 +19,7 @@ export default function App() {
     const [date, setDate] = useState(new Date());
     const [showPicker, setShowpicker] = useState(false);
     const [photo, setPhoto] = useState(null);
-    const [editingId, setEditingId] = useState(null); // 편집중인 Todo ID
+    const [editingId, setEditingId] = useState(null);
 
     const getPhoto = async () => {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -32,10 +32,22 @@ export default function App() {
             allowsEditing: true,
             quality: 0.8,
         });
+        if (!result.canceled) setPhoto(result.assets[0].uri);
+    };
 
-        if (result.canceled) return;
-        const uri = result.assets[0].uri;
-        setPhoto(uri);
+    const pickImage = async () => {
+        const { status } =
+            await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+            alert("권한이 필요합니다.");
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            allowsEditing: true,
+            quality: 0.8,
+        });
+        if (!result.canceled) setPhoto(result.assets[0].uri);
     };
 
     const formatDate = (d) => {
@@ -49,14 +61,13 @@ export default function App() {
         if (!text.trim() && !photo) return;
 
         if (editingId) {
-            // 수정
             setTodos(
                 todos.map((t) =>
                     t.id === editingId
                         ? {
                               ...t,
                               title: text.trim(),
-                              photo: photo,
+                              photo,
                               date: formatDate(date),
                           }
                         : t
@@ -64,17 +75,15 @@ export default function App() {
             );
             setEditingId(null);
         } else {
-            // 새로 추가
             const newTodo = {
                 id: Date.now().toString(),
                 title: text.trim(),
                 date: formatDate(date),
-                photo: photo,
+                photo,
                 anima: new Animated.Value(0),
             };
 
             setTodos([newTodo, ...todos]);
-
             Animated.timing(newTodo.anima, {
                 toValue: 1,
                 duration: 700,
@@ -86,21 +95,27 @@ export default function App() {
         setPhoto(null);
     };
 
-    const removeTodo = (id) => {
-        setTodos(todos.filter((item) => item.id !== id));
-    };
+    const removeTodo = (id) => setTodos(todos.filter((item) => item.id !== id));
 
     const editTodo = (item) => {
+        setEditingId(item.id);
         setText(item.title);
         setPhoto(item.photo);
         setDate(new Date(item.date));
-        setEditingId(item.id);
     };
 
-    const changeDate = (e, chDate) => {
-        if (Platform.OS === "android") setShowpicker(false);
-        if (chDate) setDate(chDate);
-        setShowpicker(false);
+    const changeDate = (event, selectedDate) => {
+        if (event.type === "dismissed") {
+            setShowpicker(false);
+            return;
+        }
+
+        if (selectedDate) setDate(selectedDate);
+
+        // Android는 날짜 선택하면 자동으로 닫힘
+        if (Platform.OS === "android") {
+            setShowpicker(false);
+        }
     };
 
     const TodoItem = ({ item, index }) => {
@@ -120,37 +135,32 @@ export default function App() {
             >
                 <Pressable
                     style={styles.todoItem}
-                    onLongPress={() => removeTodo(item.id)} // 길게 눌러 삭제 유지
+                    onLongPress={() => removeTodo(item.id)}
                 >
                     <Text style={styles.todoNumber}>{index + 1}.</Text>
+
                     {item.title ? (
                         <Text style={styles.todoText}>{item.title}</Text>
                     ) : null}
+
                     {item.photo && (
                         <Image
                             source={{ uri: item.photo }}
                             style={styles.todoPhoto}
                         />
                     )}
+
                     <Text style={styles.todoDate}>{item.date}</Text>
 
-                    {/* 수정 버튼만 유지, 삭제는 길게 눌러서 */}
                     <View style={styles.todoActions}>
                         <Pressable
-                            onPress={() => editTodo(item)}
                             style={styles.editBtn}
+                            onPress={() => editTodo(item)}
                         >
                             <Text style={styles.editText}>수정</Text>
                         </Pressable>
-                        <Text
-                            style={{
-                                marginLeft: 5,
-                                marginTop: 2,
-                                color: "#aaa",
-                            }}
-                        >
-                            길게 눌러 삭제
-                        </Text>
+
+                        <Text style={styles.deleteHint}>길게 눌러 삭제</Text>
                     </View>
                 </Pressable>
             </Animated.View>
@@ -161,6 +171,8 @@ export default function App() {
         <View style={styles.container}>
             <View style={styles.innerContainer}>
                 <Text style={styles.title}>Todo List</Text>
+
+                {/* 상단 입력 영역 */}
                 <View style={styles.inputRow}>
                     <TextInput
                         placeholder="할일 입력"
@@ -168,22 +180,26 @@ export default function App() {
                         onChangeText={setText}
                         style={styles.input}
                     />
-                    <Pressable onPress={getPhoto} style={styles.cameraBtn}>
-                        <Text style={styles.cameraText}>카메라</Text>
+
+                    <Pressable onPress={getPhoto} style={styles.button}>
+                        <Text style={styles.buttonText}>카메라</Text>
                     </Pressable>
+
+                    <Pressable onPress={pickImage} style={styles.button}>
+                        <Text style={styles.buttonText}>갤러리</Text>
+                    </Pressable>
+
                     <Pressable
-                        style={styles.dateBox}
                         onPress={() => setShowpicker(true)}
+                        style={styles.button}
                     >
-                        <Text style={styles.dateText}>{formatDate(date)}</Text>
-                    </Pressable>
-                    <Pressable onPress={addOrEditTodo} style={styles.addBtn}>
-                        <Text style={styles.addText}>
-                            {editingId ? "수정완료" : "추가"}
+                        <Text style={styles.buttonText}>
+                            {formatDate(date)}
                         </Text>
                     </Pressable>
                 </View>
 
+                {/* 미리보기 */}
                 {photo && (
                     <View style={styles.previewContainer}>
                         <Text style={styles.previewLabel}>미리보기</Text>
@@ -194,32 +210,57 @@ export default function App() {
                     </View>
                 )}
 
+                {/* 추가 버튼 — 미리보기 바로 위 */}
+                <Pressable style={styles.addBtnFull} onPress={addOrEditTodo}>
+                    <Text style={styles.addText}>
+                        {editingId ? "수정 완료" : "추가하기"}
+                    </Text>
+                </Pressable>
+
+                {/* 날짜 선택 */}
                 {showPicker && (
-                    <DateTimePicker
-                        value={date}
-                        mode="date"
-                        display={Platform.OS === "ios" ? "spinner" : "default"}
-                        onChange={changeDate}
-                    />
+                    <>
+                        <DateTimePicker
+                            value={date}
+                            mode="date"
+                            display={
+                                Platform.OS === "ios" ? "spinner" : "default"
+                            }
+                            onChange={changeDate}
+                        />
+
+                        {Platform.OS === "ios" && (
+                            <Pressable
+                                style={styles.iosDoneBtn}
+                                onPress={() => setShowpicker(false)}
+                            >
+                                <Text style={styles.iosDoneText}>
+                                    날짜 선택 완료
+                                </Text>
+                            </Pressable>
+                        )}
+                    </>
                 )}
 
                 <FlatList
                     style={styles.list}
                     data={todos}
                     keyExtractor={(item) => item.id}
+                    renderItem={({ item, index }) => (
+                        <TodoItem item={item} index={index} />
+                    )}
                     ListEmptyComponent={
                         <View style={styles.emptyBox}>
                             <Text style={styles.emptyText}>할일이 없어요</Text>
                         </View>
                     }
-                    renderItem={({ item, index }) => (
-                        <TodoItem item={item} index={index} />
-                    )}
                 />
             </View>
         </View>
     );
 }
+
+const BUTTON_HEIGHT = 40;
 
 const styles = StyleSheet.create({
     container: {
@@ -234,70 +275,88 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
         marginBottom: 20,
         textAlign: "center",
-        color: "#333",
     },
-    inputRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-    input: {
-        flex: 1,
-        height: 40,
-        borderWidth: 1,
-        borderColor: "#ccc",
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        backgroundColor: "#fff",
-    },
-    cameraBtn: {
-        marginLeft: 8,
-        backgroundColor: "orange",
-        padding: 8,
-        borderRadius: 8,
-    },
-    cameraText: { color: "#fff", fontSize: 16 },
-    dateBox: {
-        marginLeft: 8,
-        backgroundColor: "skyblue",
+
+    // 버튼 크기 통일
+    button: {
+        height: BUTTON_HEIGHT,
         paddingHorizontal: 10,
-        paddingVertical: 8,
+        backgroundColor: "blue",
+        justifyContent: "center",
+        alignItems: "center",
         borderRadius: 8,
+        marginLeft: 6,
     },
-    dateText: { color: "#fff", fontSize: 14, fontWeight: "bold" },
-    addBtn: {
-        marginLeft: 8,
-        backgroundColor: "red",
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 8,
+    buttonText: {
+        color: "#fff",
+        fontSize: 13,
+        fontWeight: "bold",
     },
-    addText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-    previewContainer: { marginVertical: 10, alignItems: "center" },
-    previewLabel: { fontSize: 14, marginBottom: 4, color: "#333" },
-    previewPhoto: { width: 120, height: 120, borderRadius: 8 },
-    list: { width: "100%" },
-    todoItem: {
-        backgroundColor: "#fff",
-        paddingVertical: 12,
-        paddingHorizontal: 15,
-        borderRadius: 8,
+
+    inputRow: {
+        flexDirection: "row",
+        alignItems: "center",
         marginBottom: 10,
     },
-    todoNumber: { fontWeight: "bold", marginBottom: 4, color: "#555" },
-    todoText: { fontSize: 16, color: "#333" },
-    todoDate: { fontSize: 12, color: "#888", marginTop: 2, fontWeight: "bold" },
-    todoPhoto: { width: "100%", height: 150, marginTop: 6, borderRadius: 8 },
-    todoHint: {
-        fontSize: 12,
-        color: "#aaa",
-        marginTop: 4,
-        fontStyle: "italic",
+    input: {
+        flex: 1,
+        height: BUTTON_HEIGHT,
+        borderColor: "#ccc",
+        borderWidth: 1,
+        backgroundColor: "white",
+        paddingHorizontal: 10,
+        borderRadius: 8,
     },
-    todoActions: { flexDirection: "row", marginTop: 6 },
+
+    previewContainer: { alignItems: "center", marginVertical: 10 },
+    previewLabel: { fontSize: 14, marginBottom: 4 },
+    previewPhoto: { width: 120, height: 120, borderRadius: 8 },
+
+    addBtnFull: {
+        marginTop: 5,
+        backgroundColor: "red",
+        height: BUTTON_HEIGHT,
+        borderRadius: 8,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    addText: { color: "white", fontSize: 18, fontWeight: "bold" },
+
+    iosDoneBtn: {
+        marginTop: 5,
+        paddingVertical: 10,
+        backgroundColor: "#007bff",
+        borderRadius: 8,
+        alignItems: "center",
+    },
+    iosDoneText: { color: "white", fontSize: 16, fontWeight: "bold" },
+
+    list: { width: "100%" },
+
+    todoItem: {
+        backgroundColor: "white",
+        padding: 12,
+        marginBottom: 10,
+        borderRadius: 8,
+    },
+    todoNumber: { fontWeight: "bold", color: "#444" },
+    todoText: { fontSize: 16, marginTop: 4 },
+    todoDate: { fontSize: 12, color: "#777", marginTop: 5 },
+    todoPhoto: { width: "100%", height: 150, borderRadius: 8, marginTop: 6 },
+
+    todoActions: { flexDirection: "row", marginTop: 8, alignItems: "center" },
     editBtn: {
         backgroundColor: "blue",
-        paddingHorizontal: 10,
+        paddingHorizontal: 12,
         paddingVertical: 4,
-        borderRadius: 5,
+        borderRadius: 8,
+        height: BUTTON_HEIGHT,
+        alignItems: "center",
+        justifyContent: "center",
     },
-    editText: { color: "#fff" },
-    emptyBox: { paddingVertical: 40, alignItems: "center" },
-    emptyText: { color: "#aaa", fontSize: 16 },
+    editText: { color: "white" },
+    deleteHint: { marginLeft: 8, color: "#555" },
+
+    emptyBox: { alignItems: "center", paddingVertical: 40 },
+    emptyText: { color: "#aaa" },
 });
